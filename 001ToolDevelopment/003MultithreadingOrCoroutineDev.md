@@ -431,5 +431,114 @@ if __name__ == '__main__':
 ### 协程并发操作——增加导出结果文件
 
 ```python
+# coding=utf-8
 
+# ---------------v5.0--------------------
+"""
+测试反馈：
+    1、是否可以自动识别ip或者域名！---在输入的时候判断！
+    2、如果全扫描--发现很慢！---------因为单线程的跑，效率低---建议使用多线程/协程！
+    3、如果出现扫描结果不一样，可以使用取并集  set1 |set 2----一个思路！
+优化方案：
+    1- 协程---并发操作
+
+"""
+# --------------------------------------
+
+import re
+import time
+import socket
+import gevent.pool
+import gevent.monkey
+
+
+# ip判断
+def check_ip(ip):
+    ip_address = re.compile('((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}')
+    if ip_address.match(ip) and len(ip) != 0:
+        return True
+    else:
+        return False
+
+# 域名判断
+def check_domain(hostname):
+    domain_address = re.compile('[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+\.?')
+    if domain_address.match(hostname) and len(hostname) != 0:
+        return True
+    else:
+        return False
+
+# 导出文档
+def export_file(info):
+    with open('scanPort.txt', 'a', encoding='utf-8') as f:
+        f.write(info)
+
+# 单个端口扫描
+def scan_port(ip, port):
+    sk = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sk.settimeout(0.5)
+    try:
+        conn = sk.connect_ex((ip, port))
+        if conn == 0:
+            print(f'{ip}主机名,{port}端口号已开放')
+            export_file(f'主机{ip},端口{port}已开放\n')
+    except Exception as e:
+        print(e)
+    sk.close()
+
+# 协程扫描
+gevent.monkey.patch_all()
+def gevent_scan_port(ip):
+    start_time = time.time()
+    # 创建线程池，限制协程并发数量，200个左右即可
+    g = gevent.pool.Pool(200)
+    export_file(f'主机{ip},开始扫描...\n')
+    # 存放运行的协程
+    run_gevent_list = []
+    for one in range(1, 65535+1):
+        g_pool = g.spawn(scan_port, ip, one)
+        run_gevent_list.append(g_pool)
+
+    # 运行完，主线程退出 阻塞
+    gevent.joinall(run_gevent_list)
+    end_time = time.time()
+    print('扫描结束总共耗时>>>', end_time - start_time)
+    export_file(f'主机{ip},结束扫描...\n')
+
+
+# ip扫描
+def scan_ip(ip):
+    gevent_scan_port(ip)
+
+# 域名扫描
+def domain_name_scan(domain_name):
+    # 域名判断解析
+    if 'http://' in domain_name or 'https://' in domain_name:
+        domain_name = domain_name[domain_name.find('://')+3:]
+        print('解析的域名为>>>', domain_name)
+        if check_domain(domain_name):
+            return True
+        else:
+            return False
+
+    # 获取域名ip地址
+    server_ip = socket.gethostbyname(domain_name)
+    print(f'该域名{domain_name}的ip>>>{server_ip}')
+
+    # 传入域名ip进行扫描
+    gevent_scan_port(server_ip)
+
+def main():
+    info = input("请输入需要扫描的域名或ip>>> ")
+    if check_ip(info):
+        scan_ip(info)
+    elif check_domain(info):
+        domain_name_scan(info)
+    else:
+        print('域名或ip输入有误~')
+
+
+if __name__ == '__main__':
+    main()
 ```
+
