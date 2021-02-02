@@ -128,7 +128,14 @@ mpl.rcParams['font.sans-serif'] = ['SimHei']
 mpl.rcParams['axes.unicode_minus'] = False
 
 # 绘制图形
-plt.bar(df2['股票名称'].values, height=df2['当前价格'].values)
+plt.bar(df2['股票名称'].values, height=df2['当前价格'].values, label='股票当前价')
+# 设置x轴标签旋转角度
+plt.xticks(rotation=-18)
+# 使用zip函数把股票名称和股票价格对应起来
+for a, b in zip(df2['股票名称'].values, df2['当前价格'].values):
+    print(a, b)
+    plt.text(a, b+1, b, horizontalalignment='center', verticalalignment='bottom')
+
 
 
 # 设置生效
@@ -141,8 +148,6 @@ plt.ylabel('当前价格')
 plt.show()
 
 
-
 if __name__ == '__main__':
     request_data(url_list[0])
-
 ```    
